@@ -1,0 +1,10 @@
+fastapi==0.162.7
+uvicorn[standard]==0.54.0
+SQLAlchemy==2.1.8
+pydantic==2.13.5
+python-multipart==0.0.32
+itsdangerous==2.2.0
+nh3==0.3.7
+mammoth==1.11.0
+Markdown==3.11
+markdownify==1.2.3

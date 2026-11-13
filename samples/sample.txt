@@ -1,0 +1,5 @@
+Meeting notes
+Attendees: Alice, Bob
+
+Decision: ship the MVP on Friday.
+Owner: Alice

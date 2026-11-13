@@ -1,0 +1,12 @@
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+.venv/
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.DS_Store
+e2e/screenshots/
