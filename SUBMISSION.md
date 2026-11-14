@@ -1,6 +1,6 @@
 # Submission — Ajaia Docs
 
-**Live app:** `<PASTE DEPLOYED URL HERE>`
+**Live app:** https://ajaia-docs-x092.onrender.com
 **Walkthrough video:** see `VIDEO_URL.txt`
 
 ## Test accounts (password for all: `demo1234`)

@@ -3,7 +3,7 @@
 A focused Google-Docs-style slice: create, edit (rich text), rename, import files, share with
 other users as **viewer** or **editor**, and reopen everything after a refresh.
 
-- **Live app:** _see `SUBMISSION.md`_
+- **Live app:** https://ajaia-docs-x092.onrender.com
 - **Stack:** Python 3.11+ · FastAPI · SQLAlchemy · Postgres (prod, Neon) / SQLite (local) — React 19 · TypeScript · TipTap (ProseMirror) · Vite
 - **One container:** the FastAPI app serves both the JSON API (`/api/*`) and the built SPA.
 
