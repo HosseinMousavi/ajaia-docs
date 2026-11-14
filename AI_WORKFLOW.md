@@ -42,6 +42,8 @@ used the AI to execute them and to research options quickly.
 | `node:22-alpine` Docker build image | Native build tools are less reliable on Alpine | Switched to `node:22-slim` and separated type-checking from the build |
 | Version history: one snapshot per save | Autosave fires on every pause in typing (Bob's doc reached version 27), so history would be noise | Coalesce saves by the same person within 10 minutes; created/imported/restored snapshots are never overwritten, and a restore is itself undoable |
 | Shipping new tables to the live database | Existing documents have no history; production data must survive | Documents get a "baseline" snapshot on their first edit; verified by upgrading a database created by the old release |
+| **Opening a document silently saved it** | Found while checking production at a narrow window width: history showed "edits" on documents that had only been opened. TipTap's `setEditable()` emits an update event by default, and autosave treated it as typing, which caused version churn (Bob's doc reached v27) and false "updated by a collaborator" notices. No unit test could see it | Wrote a failing browser assertion first ("opening a document must not change its version"), fixed it with `setEditable(…, false)`, and kept the assertion as a regression test |
+| Header layout with the new buttons | At ~800px wide the new buttons squeezed the document title to zero width | Made the header wrap; checked at 800, 1024 and 1440 px |
 | Database password shown in a setup screenshot | A credential exposed in a chat transcript | Rotated it in Neon before using it. The connection string lives only in Render's environment variables, never in the repo |
 
 ## How I verified correctness, UX and reliability

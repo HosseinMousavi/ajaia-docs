@@ -129,7 +129,7 @@ export default function EditorPage({ docId, me, onBack }: Props) {
       } else if (e instanceof ApiError && (e.status === 403 || e.status === 404)) {
         setStatus("error");
         setNotice("Your access to this document has changed. Reload to see the latest.");
-        editor.setEditable(false);
+        editor.setEditable(false, false);
       } else {
         setStatus("error");
         setNotice(e instanceof ApiError ? e.message : "Network error — will retry");
@@ -163,7 +163,8 @@ export default function EditorPage({ docId, me, onBack }: Props) {
       dirty.current = { title: false, content: false };
       if (editor) {
         editor.commands.setContent(d.content_html, { emitUpdate: false });
-        editor.setEditable(d.role === "owner" || d.role === "editor");
+        // emitUpdate=false: toggling editability must not look like a user edit (it would trigger autosave).
+        editor.setEditable(d.role === "owner" || d.role === "editor", false);
       }
     },
     [editor],
@@ -234,7 +235,7 @@ export default function EditorPage({ docId, me, onBack }: Props) {
           window.setTimeout(() => setNotice(null), 3000);
         } else if (latest.role !== doc.role) {
           setDoc(latest);
-          editor?.setEditable(latest.role === "owner" || latest.role === "editor");
+          editor?.setEditable(latest.role === "owner" || latest.role === "editor", false);
         }
       } catch {
         /* next tick retries */

@@ -74,9 +74,14 @@ def main() -> None:
         wait_saved(alice)
         shot(alice, "03-editor-formatting")
 
-        # --- Persistence across reload
+        # --- Persistence across reload (and opening a doc must not itself save it)
+        launch_id = alice.url.split("/doc/")[1]
+        version = lambda: alice.request.get(f"{BASE}/api/documents/{launch_id}").json()["version"]  # noqa: E731
+        before = version()
         alice.reload()
         expect(alice.get_by_label("Document title")).to_have_value("Launch plan")
+        alice.wait_for_timeout(2500)  # > autosave debounce
+        assert version() == before, f"opening a document saved it (v{before} -> v{version()})"
         html = editor.inner_html()
         assert "<h1>Launch plan</h1>" in html, html
         assert "<strong>Ship by Friday.</strong>" in html, html

@@ -190,3 +190,9 @@ details.menu > summary::-webkit-details-marker { display: none; }
 .diff ins, .diff-legend ins { background: #d9f5e3; color: #0b5e2e; text-decoration: none; }
 .diff del, .diff-legend del { background: #fde2e1; color: #a1251b; }
 .diff-legend del { text-decoration: none; }
+
+/* Header stays usable at narrow widths: the title keeps its space and the actions wrap. */
+.doc-header { flex-wrap: wrap; row-gap: 6px; }
+.title-block { flex: 1 1 240px; min-width: 200px; }
+.doc-actions { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 760px) { .doc-actions .btn { padding: 6px 9px; } .presence-text { display: none; } }
