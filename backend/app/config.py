@@ -8,6 +8,19 @@ from dataclasses import dataclass
 log = logging.getLogger(__name__)
 
 
+_PG_PREFIXES = ("postgres://", "postgresql://")
+
+
+def normalize_database_url(url: str) -> str:
+    """Hosted Postgres providers (Neon, Supabase, Render) hand out `postgres://` /
+    `postgresql://` URLs; SQLAlchemy needs the driver named explicitly for psycopg 3."""
+    url = url.strip()
+    for prefix in _PG_PREFIXES:
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url.removeprefix(prefix)
+    return url
+
+
 def _bool(value: str | None, default: bool) -> bool:
     if value is None:
         return default
@@ -33,7 +46,7 @@ class Settings:
             secret = secrets.token_urlsafe(32)
             log.warning("SECRET_KEY not set; generated an ephemeral key (sessions reset on restart).")
         return cls(
-            database_url=os.environ.get("DATABASE_URL", "sqlite:///./data/ajaia.db"),
+            database_url=normalize_database_url(os.environ.get("DATABASE_URL", "sqlite:///./data/ajaia.db")),
             secret_key=secret,
             max_upload_bytes=int(os.environ.get("MAX_UPLOAD_BYTES", 2 * 1024 * 1024)),
             max_content_bytes=int(os.environ.get("MAX_CONTENT_BYTES", 1 * 1024 * 1024)),

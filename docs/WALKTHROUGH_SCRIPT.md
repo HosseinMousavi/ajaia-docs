@@ -33,7 +33,7 @@ sharing that's correct by construction, and a build you can actually test."
 - Deprioritized: version history, comments, images, sign-up.
 
 **3:35 – AI workflow (30 s)**
-- Used Claude as a coding agent with a test-first loop; 36 tests + a two-user Playwright E2E.
+- Used Claude as a coding agent with a test-first loop; 42 tests (on SQLite and Postgres) + a two-user Playwright E2E.
 - Give one or two examples from `AI_WORKFLOW.md` of output you changed (e.g. the SPA
   route returning 200 for unknown API paths, seed data leaking into tests).
 

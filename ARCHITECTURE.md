@@ -21,12 +21,12 @@ Browser (React + TipTap)  ──JSON over /api, HttpOnly cookie──▶  FastAP
                                                                  ├─ routers/   (HTTP only)
                                                                  ├─ access.py  (authorization)
                                                                  ├─ sanitize.py / importers.py
-                                                                 └─ SQLAlchemy ─▶ SQLite
+                                                                 └─ SQLAlchemy ─▶ Postgres (Neon) | SQLite
 ```
 
 One process serves the API and the static SPA, so there's no CORS and only one thing to
-deploy. The database URL is configurable; nothing is SQLite-specific apart from two PRAGMAs,
-so moving to Postgres is a config change plus migrations.
+deploy. **Production uses Neon Postgres; local dev uses a SQLite file**, so it runs locally
+with no setup. The whole test suite runs against both (`TEST_DATABASE_URL`).
 
 **Data model:** `users`, `documents` (owner_id, title, content_html, version, timestamps),
 `document_shares` (document_id, user_id, role ∈ {viewer, editor}, unique per pair, cascades on
@@ -42,7 +42,7 @@ delete). Document IDs are random UUIDs so they can't be enumerated.
 | **Optimistic concurrency** (`version` + `base_version`, 409 on mismatch) instead of real-time CRDT | Real-time co-editing (Yjs + websockets) is the right long-term answer but is a multi-day feature to do well. Versioning guarantees no silent overwrites today | Two people typing at the same moment get a conflict banner rather than a merge. Idle viewers poll every 5 s to pick up saves |
 | **Seeded users + signed-cookie sessions** | Brief allows mocked auth; real password hashing (scrypt) and HttpOnly/SameSite=Lax cookies cost little and avoid demo-only shortcuts like user-id headers | No sign-up, password reset, or SSO |
 | **Import creates a new document** | Clearest product behavior; supports the most common formats (.txt, .md, .docx via mammoth) | No PDF/Google Docs import; no attachments; images in .docx are dropped by the sanitizer |
-| **SQLite** | Zero-ops, file-based, fine for a single instance | One writer at a time; on Render free the disk is ephemeral (documented) |
+| **Render free + Neon Postgres** | Both free with no card; Render's free disk is wiped on sleep, so state must live in an external DB. `pool_pre_ping` handles Neon suspending idle compute | Cold starts (~30–60 s after idle). Schema is created with `create_all`, not migrations |
 
 ## Security / privacy posture (sized to the scope)
 
@@ -60,7 +60,7 @@ delete). Document IDs are random UUIDs so they can't be enumerated.
 
 ## Testing strategy
 
-Built test-first. **36 pytest tests** cover auth, CRUD, validation, size limits, XSS
+Built test-first. **42 pytest tests**, run against both SQLite and Postgres, cover auth, CRUD, validation, size limits, XSS
 sanitization, version conflicts, import of each format and each rejection path, the
 full permission matrix, revocation, and cascade deletes. A **Playwright E2E** runs two real
 browser sessions through the main flows. TypeScript runs in strict mode.
@@ -70,7 +70,7 @@ browser sessions through the main flows. TypeScript runs in strict mode.
 1. **Real-time co-editing** with Yjs over a websocket (TipTap has first-class support);
    presence avatars and cursors would replace polling + conflict banner.
 2. **Version history** — store a snapshot per N saves; restore UI.
-3. **Postgres + Alembic migrations** for multi-instance deploys.
+3. **Alembic migrations** instead of `create_all`, so the schema can evolve safely.
 4. Login rate limiting, CSRF token, audit log of share changes.
 5. Comments / suggestion mode.
 

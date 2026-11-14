@@ -32,6 +32,7 @@ Concrete examples from this build:
 | SPA catch-all route | Answered unknown `/api/*` paths with `index.html` and **HTTP 200** — hides client bugs | Wrote a failing test, then returned JSON 404 for `/api/*` |
 | A stray "lazy app" line at the end of `main.py` | Dead/confusing code | Deleted; uvicorn uses `--factory` |
 | `node:22-alpine` build image | Native binaries in Vite 8 / TS 7 are riskier on musl | Switched to `node:22-slim`; separated `typecheck` from `build` |
+| Deployment on Render free with SQLite | Render's free disk is wiped when the instance sleeps — reviewers' documents would vanish | Added Postgres (Neon) support test-first, ran the full suite + E2E against Postgres, verified data survives a server restart |
 | Deprecated `HTTP_413_REQUEST_ENTITY_TOO_LARGE` | Warnings in test output | Switched to `HTTP_413_CONTENT_TOO_LARGE` |
 
 Judgment calls I kept for myself: the scope cuts (no CRDT real-time, no version history),
@@ -40,7 +41,7 @@ JSON, and optimistic versioning instead of last-write-wins.
 
 ## How I verified correctness, UX and reliability
 
-1. **36 backend tests** — especially `test_sharing_isolation.py` (a third user, Carol,
+1. **42 backend tests**, run against both SQLite and a real Postgres 16 — especially `test_sharing_isolation.py` (a third user, Carol,
    must never see Alice's document through any endpoint) and XSS sanitization tests.
 2. **Playwright E2E** with two browser contexts: create → format → reload persistence →
    share as viewer → import → read-only enforcement → cross-user edit propagation.

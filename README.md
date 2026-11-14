@@ -4,7 +4,7 @@ A focused Google-Docs-style slice: create, edit (rich text), rename, import file
 other users as **viewer** or **editor**, and reopen everything after a refresh.
 
 - **Live app:** _see `SUBMISSION.md`_
-- **Stack:** Python 3.11+ · FastAPI · SQLAlchemy · SQLite — React 19 · TypeScript · TipTap (ProseMirror) · Vite
+- **Stack:** Python 3.11+ · FastAPI · SQLAlchemy · Postgres (prod, Neon) / SQLite (local) — React 19 · TypeScript · TipTap (ProseMirror) · Vite
 - **One container:** the FastAPI app serves both the JSON API (`/api/*`) and the built SPA.
 
 ## Demo accounts
@@ -67,7 +67,7 @@ The SQLite file is created at `backend/data/ajaia.db` (or `/data/ajaia.db` in Do
 
 | Var | Default | Notes |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./data/ajaia.db` | Any SQLAlchemy URL |
+| `DATABASE_URL` | `sqlite:///./data/ajaia.db` | SQLite or Postgres. `postgres://…` / `postgresql://…` URLs (Neon, Supabase) are accepted as-is |
 | `SECRET_KEY` | random per boot | **Set in production**, otherwise sessions reset on restart |
 | `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 | `SEED_DEMO_USERS` / `SEED_SAMPLE_CONTENT` | `true` | Demo accounts and the shared welcome doc |
@@ -77,7 +77,8 @@ The SQLite file is created at `backend/data/ajaia.db` (or `/data/ajaia.db` in Do
 ## Tests
 
 ```bash
-cd backend && pytest                 # 36 API/unit tests, ~5 s
+cd backend && pytest                 # 42 API/unit tests, ~5 s (SQLite)
+TEST_DATABASE_URL=postgresql://user@localhost/ajaia_test pytest   # same suite on Postgres
 cd frontend && npm run typecheck     # strict TypeScript
 # Browser E2E (server running on :8000 with a fresh DB):
 pip install playwright && playwright install chromium
@@ -92,16 +93,23 @@ The E2E script drives two real browser sessions (Alice and Bob) through create �
 reload → share → import → read-only view → cross-user edit propagation, and saves the
 screenshots in `docs/screenshots/`.
 
-## Deploy
+## Deploy (free: Render + Neon)
 
-The repo is a single Dockerfile, so any container host works. Two tested-by-config paths:
+Production runs on **Render's free web service** (Docker) with a **Neon free Postgres**
+database (no credit card). Render's free disk is wiped whenever the instance sleeps, so
+the database must live outside the container.
 
-- **Railway (CLI, no GitHub needed):** `railway login && railway init && railway up`, then in
-  the service settings add a Volume mounted at `/data`, set `SECRET_KEY` (any long random
-  string) and `COOKIE_SECURE=true`, and *Generate Domain*. `railway.json` sets the health check.
-- **Render (free):** push to GitHub → Render → *New → Blueprint* → select the repo
-  (`render.yaml`). Note: the free plan has no persistent disk, so data resets when the
-  instance restarts/redeploys (demo users are re-seeded automatically).
+1. **Neon:** sign up at neon.com → create a project → copy the connection string
+   (`postgresql://…?sslmode=require`).
+2. **GitHub:** push this repo.
+3. **Render:** *New → Blueprint* → select the repo → paste the Neon string into
+   `DATABASE_URL` when prompted → *Apply*. `render.yaml` generates `SECRET_KEY`, sets
+   `COOKIE_SECURE=true` and the `/api/health` check.
+
+Tables and demo users are created automatically on first boot (idempotent). Free-tier
+caveat: the Render service sleeps after ~15 min idle, so the first request takes 30–60 s.
+
+Any other Docker host works too (`railway.json` is included for Railway).
 
 ## Project layout
 

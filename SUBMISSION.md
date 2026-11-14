@@ -9,6 +9,9 @@
 - `bob@ajaia.test` — has edit access to Alice's welcome doc
 - `carol@ajaia.test` — no access to anything (isolation check)
 
+Hosted on Render's free tier: if the app has been idle, the first load takes 30–60 s
+while it wakes up. Data is stored in Postgres (Neon) and persists across restarts.
+
 The login page has one-click buttons for each account. Use two browsers (or one normal + one
 private window) to see sharing and cross-user updates side by side.
 
@@ -18,7 +21,7 @@ private window) to see sharing and cross-user updates side by side.
 |---|---|
 | Source code — backend (FastAPI) | `backend/` |
 | Source code — frontend (React + TipTap) | `frontend/` |
-| Automated tests (36 pytest) | `backend/tests/` |
+| Automated tests (42 pytest, SQLite + Postgres) | `backend/tests/` |
 | Browser E2E test (Playwright) | `e2e/smoke_test.py` |
 | Setup & run instructions | `README.md` |
 | Architecture note | `ARCHITECTURE.md` |
@@ -41,7 +44,7 @@ collaborators' saves, Markdown export.
 
 **Partial / intentionally not built:** real-time character-level co-editing (conflicts are
 detected and resolved by choice, not merged), version history, comments, images/tables,
-sign-up/password reset, Postgres.
+sign-up/password reset, database migrations.
 
 **Next 2–4 hours:** Yjs real-time collaboration with presence; version history with
-restore; Postgres + migrations; login rate limiting and CSRF token.
+restore; Alembic migrations; login rate limiting and CSRF token.

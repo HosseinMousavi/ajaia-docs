@@ -20,7 +20,8 @@ def make_engine(url: str) -> Engine:
         db_path = url.removeprefix("sqlite:///")
         if db_path and db_path != ":memory:":
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(url, connect_args=connect_args)
+    # pool_pre_ping: serverless Postgres (Neon) suspends idle compute and drops connections.
+    engine = create_engine(url, connect_args=connect_args, pool_pre_ping=not is_sqlite)
 
     if is_sqlite:
 
