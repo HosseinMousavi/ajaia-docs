@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Document, DocumentShare, User
 from app.security import hash_password
+from app.versions import record_initial
 
 DEMO_PASSWORD = "demo1234"
 DEMO_USERS: tuple[tuple[str, str], ...] = (
@@ -19,7 +20,8 @@ WELCOME_HTML = (
     "<h2>Try it</h2>"
     "<ul><li>Format text with the toolbar or <code>Cmd/Ctrl+B</code>, <code>I</code>, <code>U</code></li>"
     "<li>Rename the document by editing the title</li>"
-    "<li>Share it from the <strong>Share</strong> button</li></ul>"
+    "<li>Share it from the <strong>Share</strong> button as viewer, commenter or editor</li>"
+    "<li>Select text and add a comment; open <strong>History</strong> to compare and restore versions</li></ul>"
 )
 
 
@@ -38,5 +40,6 @@ def seed_demo_data(db: Session, *, with_sample_content: bool = True) -> None:
     welcome = Document(owner_id=alice.id, title="Welcome to Ajaia Docs", content_html=WELCOME_HTML)
     db.add(welcome)
     db.flush()
+    record_initial(db, welcome, "created")
     db.add(DocumentShare(document_id=welcome.id, user_id=bob.id, role="editor"))
     db.commit()

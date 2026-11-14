@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, type Share, type User } from "../api";
+import { api, ApiError, type Share, type ShareRole, type User } from "../api";
 
 interface Props {
   docId: string;
@@ -11,7 +11,7 @@ interface Props {
 export default function ShareDialog({ docId, owner, initial, onClose }: Props) {
   const [shares, setShares] = useState<Share[]>(initial);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Share["role"]>("editor");
+  const [role, setRole] = useState<ShareRole>("editor");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,7 +43,7 @@ export default function ShareDialog({ docId, owner, initial, onClose }: Props) {
     });
   };
 
-  const changeRole = (s: Share, r: Share["role"]) =>
+  const changeRole = (s: Share, r: ShareRole) =>
     run(async () => {
       await api.share(docId, s.user.email, r);
       setShares(await api.listShares(docId));
@@ -67,8 +67,9 @@ export default function ShareDialog({ docId, owner, initial, onClose }: Props) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <select value={role} onChange={(e) => setRole(e.target.value as Share["role"])} aria-label="Access level">
+          <select value={role} onChange={(e) => setRole(e.target.value as ShareRole)} aria-label="Access level">
             <option value="editor">Can edit</option>
+            <option value="commenter">Can comment</option>
             <option value="viewer">Can view</option>
           </select>
           <button className="btn primary" disabled={busy}>
@@ -100,10 +101,11 @@ export default function ShareDialog({ docId, owner, initial, onClose }: Props) {
               <select
                 value={s.role}
                 disabled={busy}
-                onChange={(e) => changeRole(s, e.target.value as Share["role"])}
+                onChange={(e) => changeRole(s, e.target.value as ShareRole)}
                 aria-label={`Access for ${s.user.name}`}
               >
                 <option value="editor">Can edit</option>
+                <option value="commenter">Can comment</option>
                 <option value="viewer">Can view</option>
               </select>
               <button className="link danger" disabled={busy} onClick={() => revoke(s)}>

@@ -5,11 +5,12 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
-from markdownify import markdownify
 from sqlalchemy import select
 
+from app import versions
 from app.access import Permission, load_document, owned_documents, shared_documents
 from app.deps import CurrentUser, DbSession
+from app.exporters import to_markdown, to_pdf
 from app.importers import ImportError_, UnsupportedFileType, file_to_html, title_from_filename
 from app.models import Document, DocumentShare, User
 from app.sanitize import sanitize_html
@@ -72,6 +73,8 @@ def list_documents(user: CurrentUser, db: DbSession) -> DocumentList:
 def create_document(body: DocumentCreate, request: Request, user: CurrentUser, db: DbSession) -> DocumentOut:
     doc = Document(owner_id=user.id, title=body.title, content_html=_clean_content(request, body.content_html))
     db.add(doc)
+    db.flush()
+    versions.record_initial(db, doc, "created")
     db.commit()
     db.refresh(doc)
     return _full(doc, "owner")
@@ -94,6 +97,8 @@ async def import_document(file: UploadFile, request: Request, user: CurrentUser,
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     doc = Document(owner_id=user.id, title=title_from_filename(filename), content_html=html)
     db.add(doc)
+    db.flush()
+    versions.record_initial(db, doc, "imported")
     db.commit()
     db.refresh(doc)
     return _full(doc, "owner")
@@ -115,11 +120,14 @@ def update_document(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": "Document was modified by someone else", "current_version": doc.version},
         )
+    new_content = _clean_content(request, body.content_html) if body.content_html is not None else None
+    versions.ensure_baseline(db, doc)
     if body.title is not None:
         doc.title = body.title
-    if body.content_html is not None:
-        doc.content_html = _clean_content(request, body.content_html)
+    if new_content is not None:
+        doc.content_html = new_content
     doc.version += 1
+    versions.record_edit(db, doc, user.id)
     db.commit()
     db.refresh(doc)
     return _full(doc, role)
@@ -138,15 +146,17 @@ _UNSAFE_FILENAME = re.compile(r"[^\w\- .]+")
 
 @router.get("/{doc_id}/export")
 def export_document(
-    doc_id: str, user: CurrentUser, db: DbSession, format: Literal["md"] = "md"
+    doc_id: str, user: CurrentUser, db: DbSession, format: Literal["md", "pdf"] = "md"
 ) -> Response:
     doc, _ = load_document(db, doc_id, user, Permission.VIEW)
-    body = f"# {doc.title}\n\n" if not doc.content_html.lstrip().startswith("<h1") else ""
-    body += markdownify(doc.content_html, heading_style="ATX", bullets="-").strip() + "\n"
     safe_name = _UNSAFE_FILENAME.sub("_", doc.title).strip() or "document"
+    if format == "pdf":
+        content, media_type = to_pdf(doc.title, doc.content_html), "application/pdf"
+    else:
+        content, media_type = to_markdown(doc.title, doc.content_html), "text/markdown; charset=utf-8"
     return Response(
-        content=body,
-        media_type="text/markdown; charset=utf-8",
+        content=content,
+        media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.{format}"'},
     )
 

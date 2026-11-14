@@ -5,13 +5,16 @@ Usage:
     python e2e/smoke_test.py http://localhost:8000   # against a freshly seeded server
 
 Covers: login, create, rename, rich-text formatting, autosave + reload persistence,
-sharing (viewer), file import, owned-vs-shared listing, read-only enforcement in the UI.
+sharing (viewer/commenter/editor), file import, owned-vs-shared listing, read-only
+enforcement in the UI, live presence, anchored comments with reply/resolve, version
+history with diff + restore, and PDF export.
 Writes screenshots to e2e/screenshots/.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -85,6 +88,10 @@ def main() -> None:
         alice.get_by_label("Access level").select_option("viewer")
         alice.get_by_role("dialog").get_by_role("button", name="Share").click()
         expect(alice.get_by_role("dialog").get_by_text("Bob Rivera")).to_be_visible()
+        alice.get_by_placeholder("Add people by email").fill("carol@ajaia.test")
+        alice.get_by_label("Access level").select_option("commenter")
+        alice.get_by_role("dialog").get_by_role("button", name="Share").click()
+        expect(alice.get_by_role("dialog").get_by_text("Carol Okafor")).to_be_visible()
         shot(alice, "04-share-dialog")
         # Validation: unknown user
         alice.get_by_placeholder("Add people by email").fill("nobody@ajaia.test")
@@ -130,6 +137,57 @@ def main() -> None:
         alice.get_by_role("button", name="Welcome to Ajaia Docs").click()
         expect(alice.locator(".tiptap")).to_contain_text("Bob was here.", timeout=10_000)
         shot(alice, "08-alice-sees-bob-edit")
+
+        # --- Presence: Bob is still in the welcome doc, so Alice sees his avatar
+        expect(alice.locator(".presence")).to_contain_text("Bob", timeout=12_000)
+        shot(alice, "09-presence")
+
+        # --- Version history: diff against an older version, then restore it
+        alice.get_by_role("button", name=re.compile("History")).click()
+        panel = alice.get_by_role("complementary", name="Version history")
+        expect(panel.get_by_role("button", name=re.compile(r"^Edited"))).to_be_visible()
+        panel.get_by_role("button", name=re.compile(r"^(Created|Earlier version)")).click()
+        expect(alice.get_by_test_id("version-diff").locator("del")).to_contain_text("Bob was here.")
+        shot(alice, "10-history-diff")
+        alice.get_by_role("button", name="Restore this version").click()
+        expect(alice.locator(".tiptap")).not_to_contain_text("Bob was here.")
+        expect(panel.get_by_role("button", name=re.compile(r"^Restored v1"))).to_be_visible()
+        expect(bob.locator(".tiptap")).not_to_contain_text("Bob was here.", timeout=12_000)
+
+        # --- Comments: Carol (commenter) comments on selected text
+        carol = browser.new_context(viewport={"width": 1280, "height": 860}).new_page()
+        login(carol, "Carol Okafor")
+        carol.get_by_role("tab", name="Shared with me").click()
+        carol.get_by_role("button", name="Launch plan").click()
+        expect(carol.locator(".meta")).to_contain_text("Can comment")
+        expect(carol.get_by_role("toolbar")).to_have_count(0)
+        carol.locator(".tiptap strong", has_text="Ship by Friday.").click(click_count=3)
+        carol.get_by_role("button", name=re.compile("Comments")).click()
+        expect(carol.locator(".c-quote.pending")).to_contain_text("Ship by Friday")
+        carol.get_by_placeholder("Comment on the selected text…").fill("Is Friday a hard deadline?")
+        carol.get_by_role("button", name="Comment", exact=True).click()
+        expect(carol.locator(".thread")).to_contain_text("Is Friday a hard deadline?")
+        shot(carol, "11-carol-comments")
+
+        # Alice opens the doc: the comments panel opens itself, she sees Carol, replies and resolves
+        alice.get_by_role("button", name="Back to documents").click()
+        alice.get_by_role("button", name="Launch plan").click()
+        thread = alice.locator(".thread").first
+        expect(thread).to_contain_text("Is Friday a hard deadline?", timeout=12_000)
+        expect(alice.locator(".presence")).to_contain_text("Carol", timeout=12_000)
+        thread.get_by_placeholder("Reply…").fill("Yes, launch is locked.")
+        thread.get_by_placeholder("Reply…").press("Enter")
+        expect(thread).to_contain_text("Yes, launch is locked.")
+        shot(alice, "12-alice-replies")
+        thread.get_by_role("button", name="✓ Resolve").click()
+        expect(alice.get_by_role("tab", name=re.compile("Resolved"))).to_contain_text("1")
+        expect(carol.locator(".thread")).to_have_count(0, timeout=12_000)  # moved to Resolved for Carol too
+
+        # --- PDF export
+        doc_id = alice.url.split("/doc/")[1]
+        pdf = alice.request.get(f"{BASE}/api/documents/{doc_id}/export?format=pdf")
+        assert pdf.ok and pdf.headers["content-type"] == "application/pdf"
+        assert pdf.body().startswith(b"%PDF")
 
         browser.close()
     print("E2E smoke test passed. Screenshots in", SHOTS)

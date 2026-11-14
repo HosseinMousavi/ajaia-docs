@@ -38,6 +38,7 @@ class Settings:
     cookie_secure: bool = False
     static_dir: str | None = None
     session_max_age_seconds: int = 7 * 24 * 3600
+    presence_ttl_seconds: float = 15.0
 
     @classmethod
     def from_env(cls) -> Settings:

@@ -18,15 +18,21 @@ from app.models import Document, DocumentShare, User
 
 class Permission(StrEnum):
     VIEW = "view"
+    COMMENT = "comment"
     EDIT = "edit"
     MANAGE = "manage"  # share, unshare, delete
 
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
-    "owner": frozenset({Permission.VIEW, Permission.EDIT, Permission.MANAGE}),
-    "editor": frozenset({Permission.VIEW, Permission.EDIT}),
+    "owner": frozenset(Permission),
+    "editor": frozenset({Permission.VIEW, Permission.COMMENT, Permission.EDIT}),
+    "commenter": frozenset({Permission.VIEW, Permission.COMMENT}),
     "viewer": frozenset({Permission.VIEW}),
 }
+
+
+def can(role: str, permission: Permission) -> bool:
+    return permission in ROLE_PERMISSIONS[role]
 
 
 class DocumentNotFound(Exception):

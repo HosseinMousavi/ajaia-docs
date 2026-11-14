@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from app.access import DocumentNotFound, PermissionDenied
 from app.config import Settings
 from app.db import Base, make_engine, make_sessionmaker
-from app.routers import auth, documents
+from app.presence import PresenceTracker
+from app.routers import auth, collab, documents
 from app.security import SessionSigner
 from app.seed import seed_demo_data
 
@@ -36,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.sessionmaker = session_factory
     app.state.signer = SessionSigner(settings.secret_key, settings.session_max_age_seconds)
+    app.state.presence = PresenceTracker(ttl_seconds=settings.presence_ttl_seconds)
 
     @app.exception_handler(DocumentNotFound)
     async def _not_found(_req: Request, _exc: DocumentNotFound) -> JSONResponse:
@@ -57,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(documents.router)
+    app.include_router(collab.router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

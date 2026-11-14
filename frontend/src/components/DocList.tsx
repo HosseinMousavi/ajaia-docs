@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, MAX_UPLOAD_MB, SUPPORTED_UPLOADS, type DocSummary } from "../api";
-
-function timeAgo(iso: string): string {
-  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (secs < 60) return "just now";
-  if (secs < 3600) return `${Math.floor(secs / 60)} min ago`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)} h ago`;
-  return new Date(iso).toLocaleDateString();
-}
+import { api, ApiError, MAX_UPLOAD_MB, ROLE_LABEL, SUPPORTED_UPLOADS, timeAgo, type DocSummary } from "../api";
 
 type Tab = "owned" | "shared";
 
@@ -111,7 +103,7 @@ export default function DocList({ onOpen }: { onOpen: (id: string) => void }) {
               <span className="doc-title">{d.title}</span>
               {tab === "shared" ? (
                 <span className="muted small">
-                  {d.owner.name} · <span className={`badge ${d.role}`}>{d.role === "editor" ? "Can edit" : "View only"}</span>
+                  {d.owner.name} · <span className={`badge ${d.role}`}>{ROLE_LABEL[d.role]}</span>
                 </span>
               ) : (
                 <span className="badge owner">Owner</span>

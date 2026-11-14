@@ -9,3 +9,4 @@ mammoth==1.11.0
 Markdown==3.11
 markdownify==1.2.3
 psycopg[binary]==3.3.9
+xhtml2pdf==0.2.28

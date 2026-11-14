@@ -1,7 +1,8 @@
 # Ajaia Docs — a lightweight collaborative document editor
 
 A focused Google-Docs-style slice: create, edit (rich text), rename, import files, share with
-other users as **viewer** or **editor**, and reopen everything after a refresh.
+other users as **viewer, commenter or editor**, and reopen everything after a refresh, plus
+live presence, anchored comments, version history with a visual diff, and PDF/Markdown export.
 
 - **Live app:** https://ajaia-docs-x092.onrender.com
 - **Stack:** Python 3.11+ · FastAPI · SQLAlchemy · Postgres (prod, Neon) / SQLite (local) — React 19 · TypeScript · TipTap (ProseMirror) · Vite
@@ -12,26 +13,38 @@ other users as **viewer** or **editor**, and reopen everything after a refresh.
 All seeded on first boot. Password for every account: **`demo1234`**
 (the login screen also has one-click buttons).
 
-| User | Email | Starts with |
+| User | Email | Documents (live site) |
 |---|---|---|
 | Alice Chen | `alice@ajaia.test` | Owns "Welcome to Ajaia Docs" |
-| Bob Rivera | `bob@ajaia.test` | Has **edit** access to Alice's welcome doc |
-| Carol Okafor | `carol@ajaia.test` | Nothing — use her to verify isolation |
+| Bob Rivera | `bob@ajaia.test` | Can **edit** Alice's welcome doc; owns "Bob's doc", shared with Carol as editor |
+| Carol Okafor | `carol@ajaia.test` | Can **edit** Bob's doc; has no access to Alice's documents (isolation check) |
 
 **2-minute review path:** sign in as Alice → create a doc, format it → *Share* → add
 `bob@ajaia.test` as *Can view* → sign out → sign in as Bob → *Shared with me* tab shows it as
 "View only" and the editor is read-only → open the welcome doc (Bob can edit) and type →
-Alice's open copy picks up the change within ~5 s. Carol sees neither document.
+Alice's open copy picks up the change within ~5 s. Sign in as Carol: she sees Bob's doc
+under *Shared with me* but none of Alice's documents.
+
+**Collaboration features (1 more minute):** open a doc in two windows (Alice + Bob) to see
+live presence avatars → select text as Carol on a doc shared with her as *Can comment* and add
+a comment → reply/resolve as the owner → open **History**, click an older version to see a
+red/green diff, and **Restore** it → **Export ▾ → PDF**.
+
+A fresh local database is seeded with the three users and the welcome doc only.
 
 ## Features
 
 | Area | What works |
 |---|---|
 | Editing | Bold, italic, underline, strikethrough, H1–H3, bulleted & numbered lists, quote, undo/redo, clear formatting, keyboard shortcuts |
-| Documents | Create, rename (inline title), autosave (800 ms debounce) with saved/saving status, reopen, delete (owner), export to Markdown |
+| Documents | Create, rename (inline title), autosave (800 ms debounce) with saved/saving status, reopen, delete (owner) |
 | File import | `.txt`, `.md`/`.markdown`, `.docx` → new editable document, **max 2 MB**. Limits shown in the UI. Samples in `samples/` |
-| Sharing | Owner shares by email as *viewer* or *editor*, changes role, revokes. "My documents" vs "Shared with me" tabs, role badges |
-| Concurrency | Optimistic versioning: a stale save returns **409** and the UI offers *Load their version* / *Keep mine*. Idle editors poll every 5 s for collaborators' saves |
+| Sharing (roles) | Owner shares by email as **viewer**, **commenter** or **editor**, changes role, revokes. "My documents" vs "Shared with me" tabs, role badges. Matrix: viewer reads · commenter reads + comments · editor + edits · owner + shares/deletes |
+| Live presence | Avatars of everyone else in the document right now, with "viewing" / "editing" status (5 s heartbeat, 15 s expiry) |
+| Comments | Select text → comment on it (the quote is stored with the comment; clicking it jumps to the text). Replies, resolve/reopen, open/resolved tabs. Authors delete their own comments; the owner can moderate any |
+| Version history | Automatic snapshots (saves by the same person within 10 min are grouped). Click a version to see a **word-level diff** against the current text (green = would come back, red = would be removed) and **restore** it; the restore is itself a new version, so nothing is ever lost |
+| Export | **PDF** (rendered server-side) and **Markdown** |
+| Concurrency | Optimistic versioning: a stale save (or restore) returns **409** and the UI offers *Load their version* / *Keep mine*. Idle editors poll every 5 s for collaborators' saves |
 | Security | Server-side HTML allowlist sanitization (nh3) on every write and import, 404 (not 403) for documents you can't see, scrypt password hashes, signed HttpOnly SameSite cookies, random doc IDs, upload size/type/magic-byte checks |
 
 ## Run locally
@@ -77,7 +90,7 @@ The SQLite file is created at `backend/data/ajaia.db` (or `/data/ajaia.db` in Do
 ## Tests
 
 ```bash
-cd backend && pytest                 # 42 API/unit tests, ~5 s (SQLite)
+cd backend && pytest                 # 77 API/unit tests, ~12 s (SQLite)
 TEST_DATABASE_URL=postgresql://user@localhost/ajaia_test pytest   # same suite on Postgres
 cd frontend && npm run typecheck     # strict TypeScript
 # Browser E2E (server running on :8000 with a fresh DB):
@@ -89,8 +102,9 @@ The most important file is `backend/tests/test_sharing_isolation.py`: it proves 
 without a grant cannot read, list, edit, export, delete, or manage shares on another user's
 document, and that viewer/editor/owner permissions are enforced server-side.
 
-The E2E script drives two real browser sessions (Alice and Bob) through create → format →
-reload → share → import → read-only view → cross-user edit propagation, and saves the
+The E2E script drives three real browser sessions (Alice, Bob, Carol) through create →
+format → reload → share → import → read-only view → cross-user edit propagation → presence →
+history diff + restore → anchored comment, reply, resolve → PDF export, and saves the
 screenshots in `docs/screenshots/`.
 
 ## Deploy (free: Render + Neon)
@@ -118,10 +132,15 @@ backend/app/
   access.py       # the ONE place document permissions are decided
   sanitize.py     # HTML allowlist used for every write
   importers.py    # .txt/.md/.docx → HTML
-  routers/        # auth + documents/sharing HTTP layer
+  exporters.py    # Markdown + PDF
+  versions.py     # snapshot coalescing / baseline / restore
+  diff.py         # word-level diff for the history preview
+  presence.py     # in-memory "who's here" tracker with TTL
+  routers/        # auth, documents/sharing, collab (comments, versions, presence)
   models.py, schemas.py, security.py, seed.py, main.py
 backend/tests/    # pytest suite (TDD)
-frontend/src/     # React app: Login, DocList, EditorPage, Toolbar, ShareDialog
+frontend/src/     # React app: Login, DocList, EditorPage, Toolbar, ShareDialog,
+                  #   Presence, CommentsPanel, HistoryPanel
 e2e/              # Playwright smoke test
 samples/          # files to try the importer with
 ```

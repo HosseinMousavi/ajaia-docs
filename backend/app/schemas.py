@@ -78,3 +78,70 @@ class DocumentList(BaseModel):
 class ShareIn(BaseModel):
     email: Email
     role: ShareRole
+
+
+# ---------- comments ----------
+
+CommentBody = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+Quote = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
+
+
+class CommentIn(BaseModel):
+    body: CommentBody
+    quote: Quote | None = None
+    parent_id: int | None = None
+
+
+class CommentPatch(BaseModel):
+    resolved: bool
+
+
+class CommentOut(BaseModel):
+    id: int
+    parent_id: int | None
+    author: UserOut
+    body: str
+    quote: str | None
+    resolved: bool
+    created_at: datetime
+    replies: list[CommentOut] = []
+
+
+# ---------- versions ----------
+
+class VersionOut(BaseModel):
+    id: int
+    version: int
+    kind: str
+    title: str
+    author: UserOut | None
+    restored_from: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class VersionDetail(VersionOut):
+    content_html: str
+    diff: list[tuple[str, str]]
+    stats: dict[str, int]
+
+
+class RestoreIn(BaseModel):
+    base_version: int = Field(ge=1)
+
+
+# ---------- presence ----------
+
+class PresenceIn(BaseModel):
+    editing: bool = False
+
+
+class PresenceUser(BaseModel):
+    id: int
+    name: str
+    email: str
+    editing: bool
+
+
+class PresenceOut(BaseModel):
+    others: list[PresenceUser]

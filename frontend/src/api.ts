@@ -1,4 +1,12 @@
-export type Role = "owner" | "editor" | "viewer";
+export type Role = "owner" | "editor" | "commenter" | "viewer";
+export type ShareRole = Exclude<Role, "owner">;
+
+export const ROLE_LABEL: Record<Role, string> = {
+  owner: "Owner",
+  editor: "Can edit",
+  commenter: "Can comment",
+  viewer: "View only",
+};
 
 export interface User {
   id: number;
@@ -16,7 +24,41 @@ export interface DocSummary {
 
 export interface Share {
   user: User;
-  role: Exclude<Role, "owner">;
+  role: ShareRole;
+}
+
+export interface Comment {
+  id: number;
+  parent_id: number | null;
+  author: User;
+  body: string;
+  quote: string | null;
+  resolved: boolean;
+  created_at: string;
+  replies: Comment[];
+}
+
+export type VersionKind = "created" | "imported" | "baseline" | "edit" | "restored";
+
+export interface Version {
+  id: number;
+  version: number;
+  kind: VersionKind;
+  title: string;
+  author: User | null;
+  restored_from: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VersionDetail extends Version {
+  content_html: string;
+  diff: ["equal" | "insert" | "delete", string][];
+  stats: { added: number; removed: number };
+}
+
+export interface PresenceUser extends User {
+  editing: boolean;
 }
 
 export interface Doc extends DocSummary {
@@ -77,9 +119,10 @@ export const api = {
     form.append("file", file);
     return request<Doc>("/api/documents/import", { method: "POST", body: form });
   },
-  exportUrl: (id: string) => `/api/documents/${encodeURIComponent(id)}/export?format=md`,
+  exportUrl: (id: string, format: "md" | "pdf") =>
+    `/api/documents/${encodeURIComponent(id)}/export?format=${format}`,
 
-  share: (id: string, email: string, role: Share["role"]) =>
+  share: (id: string, email: string, role: ShareRole) =>
     request<Share>(`/api/documents/${encodeURIComponent(id)}/shares`, {
       method: "PUT",
       body: json({ email, role }),
@@ -87,7 +130,46 @@ export const api = {
   listShares: (id: string) => request<Share[]>(`/api/documents/${encodeURIComponent(id)}/shares`),
   revoke: (id: string, userId: number) =>
     request<void>(`/api/documents/${encodeURIComponent(id)}/shares/${userId}`, { method: "DELETE" }),
+
+  listComments: (id: string) => request<Comment[]>(`${docUrl(id)}/comments`),
+  addComment: (id: string, body: string, opts: { quote?: string | null; parent_id?: number } = {}) =>
+    request<Comment>(`${docUrl(id)}/comments`, { method: "POST", body: json({ body, ...opts }) }),
+  resolveComment: (id: string, commentId: number, resolved: boolean) =>
+    request<Comment>(`${docUrl(id)}/comments/${commentId}`, { method: "PATCH", body: json({ resolved }) }),
+  deleteComment: (id: string, commentId: number) =>
+    request<void>(`${docUrl(id)}/comments/${commentId}`, { method: "DELETE" }),
+
+  listVersions: (id: string) => request<Version[]>(`${docUrl(id)}/versions`),
+  getVersion: (id: string, versionId: number) => request<VersionDetail>(`${docUrl(id)}/versions/${versionId}`),
+  restoreVersion: (id: string, versionId: number, base_version: number) =>
+    request<Doc>(`${docUrl(id)}/versions/${versionId}/restore`, { method: "POST", body: json({ base_version }) }),
+
+  heartbeat: (id: string, editing: boolean) =>
+    request<{ others: PresenceUser[] }>(`${docUrl(id)}/presence`, { method: "POST", body: json({ editing }) }),
+  leave: (id: string) => {
+    // keepalive lets the request finish even while the page is unloading
+    void fetch(`${docUrl(id)}/presence`, { method: "DELETE", credentials: "same-origin", keepalive: true }).catch(
+      () => undefined,
+    );
+  },
 };
+
+function docUrl(id: string): string {
+  return `/api/documents/${encodeURIComponent(id)}`;
+}
+
+export function timeAgo(iso: string): string {
+  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 45) return "just now";
+  if (secs < 3600) return `${Math.max(1, Math.round(secs / 60))} min ago`;
+  if (secs < 86400) return `${Math.round(secs / 3600)} h ago`;
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+const AVATAR_COLORS = ["#2f5bea", "#0f9d58", "#d93025", "#a142f4", "#e37400", "#00838f", "#c2185b"];
+export function avatarColor(userId: number): string {
+  return AVATAR_COLORS[userId % AVATAR_COLORS.length];
+}
 
 export const SUPPORTED_UPLOADS = ".txt,.md,.markdown,.docx";
 export const MAX_UPLOAD_MB = 2;
